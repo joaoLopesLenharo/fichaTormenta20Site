@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ficha de Personagem - Tormenta 20</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1>Ficha de Personagem - Tormenta 20</h1>
+                <!-- Removido campo de foto do personagem -->
+                <div class="header-actions">
+                    <button class="btn btn--secondary" id="importBtn">
+                        <span>📄</span> Importar JSON
+                    </button>
+                    <button class="btn btn--primary" id="exportBtn">
+                        <span>💾</span> Exportar JSON
+                    </button>
+                    <button class="btn btn--secondary" id="themeToggleBtn" title="Alternar tema">
+                        <span id="themeToggleIcon">🌙</span>
+                    </button>
+                </div>
+            </div>
+            <input type="file" id="fileInput" accept=".json" style="display: none;">
+        </header>
+
+        <div class="alert alert--error" id="errorAlert" style="display: none;">
+            <span class="alert-icon">⚠️</span>
+            <span id="errorMessage"></span>
+        </div>
+
+        <div class="alert alert--success" id="successAlert" style="display: none;">
+            <span class="alert-icon">✅</span>
+            <span id="successMessage"></span>
+        </div>
+
+        <main class="main-content">
+            <!-- Informações Básicas e Classes -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Informações Básicas</h2>
+                </div>
+                <div class="card__body">
+                    <div class="basic-grid">
+                        <div class="basic-main">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label class="form-label" for="nome">Nome</label>
+                                    <input type="text" class="form-control" id="nome" placeholder="Nome do personagem">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="nivel">Nível</label>
+                                    <input type="number" class="form-control" id="nivel" min="1" max="20" value="1" readonly>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="raca">Raça</label>
+                                    <input type="text" class="form-control" id="raca" placeholder="Raça do personagem">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="divindade">Divindade</label>
+                                    <input type="text" class="form-control" id="divindade" placeholder="Divindade">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="tendencia">Tendência</label>
+                                    <input type="text" class="form-control" id="tendencia" placeholder="Tendência">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="origem">Origem</label>
+                                    <input type="text" class="form-control" id="origem" placeholder="Origem">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label" for="deslocamento">Deslocamento</label>
+                                    <input type="number" class="form-control" id="deslocamento" value="9">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="basic-classes">
+                            <div class="classes-header">
+                                <h3>Classes</h3>
+                                <button class="btn btn--sm btn--secondary" type="button" onclick="app.addClass()">+ Adicionar Classe</button>
+                            </div>
+                            <div id="classes-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Atributos -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Atributos</h2>
+                </div>
+                <div class="card__body">
+                    <div class="attributes-grid">
+                        <div class="attribute-card">
+                            <div class="attribute-header">
+                                <h3>FOR</h3>
+                                <span class="attribute-name">Força</span>
+                            </div>
+                            <div class="attribute-value">
+                                <input type="number" class="form-control attribute-input" id="forca" min="1" max="25" value="10">
+                            </div>
+                            <div class="attribute-modifier" id="forca-mod">+0</div>
+                        </div>
+                        <div class="attribute-card">
+                            <div class="attribute-header">
+                                <h3>DES</h3>
+                                <span class="attribute-name">Destreza</span>
+                            </div>
+                            <div class="attribute-value">
+                                <input type="number" class="form-control attribute-input" id="destreza" min="1" max="25" value="10">
+                            </div>
+                            <div class="attribute-modifier" id="destreza-mod">+0</div>
+                        </div>
+                        <div class="attribute-card">
+                            <div class="attribute-header">
+                                <h3>CON</h3>
+                                <span class="attribute-name">Constituição</span>
+                            </div>
+                            <div class="attribute-value">
+                                <input type="number" class="form-control attribute-input" id="constituicao" min="1" max="25" value="10">
+                            </div>
+                            <div class="attribute-modifier" id="constituicao-mod">+0</div>
+                        </div>
+                        <div class="attribute-card">
+                            <div class="attribute-header">
+                                <h3>INT</h3>
+                                <span class="attribute-name">Inteligência</span>
+                            </div>
+                            <div class="attribute-value">
+                                <input type="number" class="form-control attribute-input" id="inteligencia" min="1" max="25" value="10">
+                            </div>
+                            <div class="attribute-modifier" id="inteligencia-mod">+0</div>
+                        </div>
+                        <div class="attribute-card">
+                            <div class="attribute-header">
+                                <h3>SAB</h3>
+                                <span class="attribute-name">Sabedoria</span>
+                            </div>
+                            <div class="attribute-value">
+                                <input type="number" class="form-control attribute-input" id="sabedoria" min="1" max="25" value="10">
+                            </div>
+                            <div class="attribute-modifier" id="sabedoria-mod">+0</div>
+                        </div>
+                        <div class="attribute-card">
+                            <div class="attribute-header">
+                                <h3>CAR</h3>
+                                <span class="attribute-name">Carisma</span>
+                            </div>
+                            <div class="attribute-value">
+                                <input type="number" class="form-control attribute-input" id="carisma" min="1" max="25" value="10">
+                            </div>
+                            <div class="attribute-modifier" id="carisma-mod">+0</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Defesa e Iniciativa -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Defesa e Iniciativa</h2>
+                </div>
+                <div class="card__body">
+                    <div class="defense-grid">
+                        <div class="defense-item">
+                            <label class="form-label">Defesa</label>
+                            <div class="defense-value" id="defesa-total">10</div>
+                            <div class="defense-breakdown">
+                                <span>10 + DES (<span id="defesa-des">+0</span>) + Armadura (<span id="defesa-armadura">+0</span>)</span>
+                            </div>
+                        </div>
+                        <div class="defense-item">
+                            <label class="form-label">Iniciativa</label>
+                            <div class="defense-value" id="iniciativa-total">+0</div>
+                            <div class="defense-breakdown">
+                                <span>DES (<span id="iniciativa-des">+0</span>) + Treinamento (<span id="iniciativa-treino">+0</span>)</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="bonus-armadura">Bônus Armadura</label>
+                            <input type="number" class="form-control" id="bonus-armadura" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="bonus-escudo">Bônus Escudo</label>
+                            <input type="number" class="form-control" id="bonus-escudo" value="0">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Recursos -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Recursos</h2>
+                    <button class="btn btn--sm btn--secondary" id="addResourceBtn">+ Adicionar Recurso</button>
+                </div>
+                <div class="card__body">
+                    <div class="resources-container">
+                        <div class="resource-item">
+                            <div class="resource-header">
+                                <h3>Vida</h3>
+                                <div class="resource-values">
+                                    <input type="number" class="form-control resource-current" id="vida-atual" min="0" value="0">
+                                    <span>/</span>
+                                    <input type="number" class="form-control resource-max" id="vida-max" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="resource-bar">
+                                <div class="resource-progress" id="vida-progress" style="background-color: #e53e3e;"></div>
+                            </div>
+                            <input type="color" class="resource-color" id="vida-color" value="#e53e3e">
+                        </div>
+                        
+                        <div class="resource-item">
+                            <div class="resource-header">
+                                <h3>Mana</h3>
+                                <div class="resource-values">
+                                    <input type="number" class="form-control resource-current" id="mana-atual" min="0" value="0">
+                                    <span>/</span>
+                                    <input type="number" class="form-control resource-max" id="mana-max" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="resource-bar">
+                                <div class="resource-progress" id="mana-progress" style="background-color: #3182ce;"></div>
+                            </div>
+                            <input type="color" class="resource-color" id="mana-color" value="#3182ce">
+                        </div>
+                        
+                        <div class="resource-item">
+                            <div class="resource-header">
+                                <h3>Prana</h3>
+                                <div class="resource-values">
+                                    <input type="number" class="form-control resource-current" id="prana-atual" min="0" value="0">
+                                    <span>/</span>
+                                    <input type="number" class="form-control resource-max" id="prana-max" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="resource-bar">
+                                <div class="resource-progress" id="prana-progress" style="background-color: #9f7aea;"></div>
+                            </div>
+                            <input type="color" class="resource-color" id="prana-color" value="#9f7aea">
+                        </div>
+                    </div>
+                    
+                    <div id="custom-resources-container"></div>
+                </div>
+            </section>
+
+            <!-- Perícias -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Perícias</h2>
+                </div>
+                <div class="card__body">
+                    <div class="skills-container" id="skills-container">
+                        <!-- Skills will be populated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Habilidades -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Habilidades</h2>
+                    <button class="btn btn--sm btn--secondary" id="addAbilityBtn">+ Adicionar Habilidade</button>
+                </div>
+                <div class="card__body">
+                    <div id="abilities-container"></div>
+                </div>
+            </section>
+
+            <!-- Poderes -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Poderes</h2>
+                    <button class="btn btn--sm btn--secondary" id="addPowerBtn">+ Adicionar Poder</button>
+                </div>
+                <div class="card__body">
+                    <div id="powers-container"></div>
+                </div>
+            </section>
+
+            <!-- Inventário -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Inventário</h2>
+                    <button class="btn btn--sm btn--secondary" id="addItemBtn">+ Adicionar Item</button>
+                </div>
+                <div class="card__body">
+                    <div class="inventory-section">
+                        <h3>Dinheiro</h3>
+                        <div class="money-grid">
+                            <div class="form-group">
+                                <label class="form-label">T$ (Tibares)</label>
+                                <input type="number" class="form-control" id="money-ts" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">PP (Platina)</label>
+                                <input type="number" class="form-control" id="money-pp" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">PO (Ouro)</label>
+                                <input type="number" class="form-control" id="money-po" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">PE (Prata)</label>
+                                <input type="number" class="form-control" id="money-pe" min="0" value="0">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">PC (Cobre)</label>
+                                <input type="number" class="form-control" id="money-pc" min="0" value="0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="inventory-section">
+                        <h3>Itens</h3>
+                        <div id="items-container"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Magias -->
+            <section class="card section">
+                <div class="card__header">
+                    <h2>Magias</h2>
+                </div>
+                <div class="card__body">
+                    <div class="spells-tabs">
+                        <button class="tab-button active" data-tab="divina">Divina</button>
+                        <button class="tab-button" data-tab="arcana">Arcana</button>
+                    </div>
+                    <div class="spells-content">
+                        <div class="tab-content active" id="divina-tab">
+                            <button class="btn btn--sm btn--secondary add-spell-btn" data-type="divina">+ Adicionar Magia</button>
+                            <div id="divina-spells-accordion"></div>
+                        </div>
+                        <div class="tab-content" id="arcana-tab">
+                            <button class="btn btn--sm btn--secondary add-spell-btn" data-type="arcana">+ Adicionar Magia</button>
+                            <div id="arcana-spells-accordion"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
