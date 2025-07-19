@@ -1175,6 +1175,16 @@ class TormentaCharacterSheet {
 
             const characterData = data.character || data;
 
+            // *** CORREÇÃO DEFINITIVA ***
+            // Limpa o campo 'bonus' problemático de qualquer ficha antiga antes de processar
+            if (characterData.pericias) {
+                Object.keys(characterData.pericias).forEach(skillName => {
+                    if (characterData.pericias[skillName]) {
+                        delete characterData.pericias[skillName].bonus;
+                    }
+                });
+            }
+
             // Compatibilidade com fichas antigas
             if (characterData.pericias) {
                 const newSkills = this.getDefaultSkills();
@@ -1183,46 +1193,43 @@ class TormentaCharacterSheet {
                     // Remover quebras de linha e espaços extras do nome
                     let skillName = oldName.replace(/\n|\r/g, '').trim();
                     // Corrigir nomes para o padrão do sistema (ex: acentos, maiúsculas)
-                    // Exemplo: "Atuacao" -> "Atuação"
-                    // Aqui pode-se criar um dicionário de correção se necessário
                     if (!(skillName in newSkills)) {
-                        // Tentar encontrar por lower case
                         const found = Object.keys(newSkills).find(k => k.toLowerCase() === skillName.toLowerCase());
                         if (found) skillName = found;
                     }
                     if (!(skillName in newSkills)) return; // Ignorar perícias não reconhecidas
                     if (!characterData.pericias[skillName]) characterData.pericias[skillName] = {};
+                    
                     // Mapear campos antigos
                     if (typeof oldData === 'object') {
                         characterData.pericias[skillName].treinada = oldData.treinada || false;
                         characterData.pericias[skillName].atributo = oldData.atributo || newSkills[skillName].atributo;
+                        
                         // Mapear bonus/penalidade para bonusExtra/desconto
-                        // CORREÇÃO: Usar 'bonusExtra' e não sobrescrever com o campo 'bonus' antigo.
-                        if (typeof oldData.bonusExtra !== 'undefined') {
-                             characterData.pericias[skillName].bonusExtra = Number(oldData.bonusExtra);
-                        } else if (typeof oldData.bonus !== 'undefined') {
-                             characterData.pericias[skillName].bonusExtra = Number(oldData.bonus);
-                        } else {
-                            characterData.pericias[skillName].bonusExtra = 0;
-                        }
+                        // Agora que 'bonus' foi deletado, isso não causará mais problemas.
+                        // Apenas o 'bonusExtra' real será lido.
+                        characterData.pericias[skillName].bonusExtra = (typeof oldData.bonusExtra !== 'undefined' && oldData.bonusExtra !== null)
+                            ? Number(oldData.bonusExtra)
+                            : 0;
                         characterData.pericias[skillName].desconto = (typeof oldData.penalidade !== 'undefined' && oldData.penalidade !== null)
                             ? Number(oldData.penalidade)
                             : (oldData.desconto || 0);
                     }
                 });
+                
                 // Garantir que todas as perícias existam
                 Object.keys(newSkills).forEach(skillName => {
                     if (!characterData.pericias[skillName]) {
                         characterData.pericias[skillName] = {
                             treinada: false,
                             atributo: newSkills[skillName].atributo,
-                            bonusExtra: 0,
-                            desconto: 0
+                            bonusExtra: '', // Iniciar como string vazia
+                            desconto: ''   // Iniciar como string vazia
                         };
                     } else {
                         // Garantir campos obrigatórios
-                        if (typeof characterData.pericias[skillName].bonusExtra === 'undefined') characterData.pericias[skillName].bonusExtra = 0;
-                        if (typeof characterData.pericias[skillName].desconto === 'undefined') characterData.pericias[skillName].desconto = 0;
+                        if (typeof characterData.pericias[skillName].bonusExtra === 'undefined') characterData.pericias[skillName].bonusExtra = '';
+                        if (typeof characterData.pericias[skillName].desconto === 'undefined') characterData.pericias[skillName].desconto = '';
                         if (typeof characterData.pericias[skillName].atributo === 'undefined') characterData.pericias[skillName].atributo = newSkills[skillName].atributo;
                         if (typeof characterData.pericias[skillName].treinada === 'undefined') characterData.pericias[skillName].treinada = false;
                     }
@@ -1248,19 +1255,6 @@ class TormentaCharacterSheet {
             // Merge with default structure to prevent missing properties
             this.character = this.mergeWithDefault(this.getDefaultCharacter(), characterData);
 
-            // Corrigir: garantir que bonusExtra e desconto sejam string vazia se não existirem
-            Object.entries(this.skills).forEach(([skillName, skillData]) => {
-                if (!this.character.pericias[skillName]) this.character.pericias[skillName] = {};
-                if (typeof this.character.pericias[skillName].bonusExtra === 'undefined') this.character.pericias[skillName].bonusExtra = '';
-                if (typeof this.character.pericias[skillName].desconto === 'undefined') this.character.pericias[skillName].desconto = '';
-                // Garantir que exporte como número ou vazio
-                if (this.character.pericias[skillName].bonusExtra === '') this.character.pericias[skillName].bonusExtra = '';
-                else this.character.pericias[skillName].bonusExtra = Number(this.character.pericias[skillName].bonusExtra);
-                if (this.character.pericias[skillName].desconto === '') this.character.pericias[skillName].desconto = '';
-                else this.character.pericias[skillName].desconto = Number(this.character.pericias[skillName].desconto);
-                // Garantir que o atributo seja restaurado corretamente
-                if (typeof this.character.pericias[skillName].atributo === 'undefined') this.character.pericias[skillName].atributo = skillData.atributo;
-            });
             // Update UI
             this.updateUI();
             this.updateAllCalculations();
@@ -1450,17 +1444,6 @@ class TormentaCharacterSheet {
     // Export character
     exportCharacter() {
         try {
-            // Corrigir: garantir que bonusExtra e desconto sejam exportados corretamente
-            Object.entries(this.skills).forEach(([skillName, skillData]) => {
-                if (!this.character.pericias[skillName]) this.character.pericias[skillName] = {};
-                if (typeof this.character.pericias[skillName].bonusExtra === 'undefined') this.character.pericias[skillName].bonusExtra = '';
-                if (typeof this.character.pericias[skillName].desconto === 'undefined') this.character.pericias[skillName].desconto = '';
-                // Garantir que exporte como número ou vazio
-                if (this.character.pericias[skillName].bonusExtra === '') this.character.pericias[skillName].bonusExtra = '';
-                else this.character.pericias[skillName].bonusExtra = Number(this.character.pericias[skillName].bonusExtra);
-                if (this.character.pericias[skillName].desconto === '') this.character.pericias[skillName].desconto = '';
-                else this.character.pericias[skillName].desconto = Number(this.character.pericias[skillName].desconto);
-            });
             // Foto: garantir que srcOriginal seja exportado
             let fotoExport = null;
             if (this.character.foto && (this.character.foto.srcOriginal || this.character.foto.src)) {
@@ -1633,22 +1616,6 @@ class TormentaCharacterSheet {
         }
         this.updateSkills();
         this.saveToLocalStorage();
-        // Atualizar input e total imediatamente
-        const input = document.querySelector(`.skill-item [name='bonus-${skillName}']`);
-        if (input) input.value = value;
-        const totalElement = document.getElementById(`skill-total-${skillName}`);
-        if (totalElement) {
-            let bonusExtra = this.character.pericias[skillName]?.bonusExtra;
-            let desconto = this.character.pericias[skillName]?.desconto;
-            bonusExtra = (bonusExtra === '' || bonusExtra === undefined) ? 0 : Number(bonusExtra);
-            desconto = (desconto === '' || desconto === undefined) ? 0 : Number(desconto);
-            const attributeModifier = this.getAttributeModifier(this.character.pericias[skillName]?.atributo || 'forca');
-            const halfLevel = Math.floor(this.character.nivel / 2);
-            const isTrainedInCharacter = this.character.pericias[skillName]?.treinada || false;
-            const trainingBonus = isTrainedInCharacter ? this.getTrainingBonus() : 0;
-            const total = halfLevel + attributeModifier + trainingBonus + bonusExtra - desconto;
-            totalElement.textContent = total >= 0 ? `+${total}` : `${total}`;
-        }
     }
     // Atualizar desconto da perícia
     updateSkillDesconto(skillName, value) {
@@ -1660,22 +1627,6 @@ class TormentaCharacterSheet {
         }
         this.updateSkills();
         this.saveToLocalStorage();
-        // Atualizar input e total imediatamente
-        const input = document.querySelector(`.skill-item [name='desconto-${skillName}']`);
-        if (input) input.value = value;
-        const totalElement = document.getElementById(`skill-total-${skillName}`);
-        if (totalElement) {
-            let bonusExtra = this.character.pericias[skillName]?.bonusExtra;
-            let desconto = this.character.pericias[skillName]?.desconto;
-            bonusExtra = (bonusExtra === '' || bonusExtra === undefined) ? 0 : Number(bonusExtra);
-            desconto = (desconto === '' || desconto === undefined) ? 0 : Number(desconto);
-            const attributeModifier = this.getAttributeModifier(this.character.pericias[skillName]?.atributo || 'forca');
-            const halfLevel = Math.floor(this.character.nivel / 2);
-            const isTrainedInCharacter = this.character.pericias[skillName]?.treinada || false;
-            const trainingBonus = isTrainedInCharacter ? this.getTrainingBonus() : 0;
-            const total = halfLevel + attributeModifier + trainingBonus + bonusExtra - desconto;
-            totalElement.textContent = total >= 0 ? `+${total}` : `${total}`;
-        }
     }
 
     // --- Dirty State e Persistência ---
@@ -1708,17 +1659,9 @@ class TormentaCharacterSheet {
             const data = localStorage.getItem('t20_last_character');
             if (data) {
                 const parsed = JSON.parse(data);
-                // CORREÇÃO: Limpar o campo 'bonus' antigo para evitar sobrescrever o 'bonusExtra'
-                if (parsed.pericias) {
-                    Object.keys(parsed.pericias).forEach(skillName => {
-                        delete parsed.pericias[skillName].bonus;
-                    });
-                }
                 this.importCharacterData(parsed);
                 this.isDirty = false;
                 this.lastExportedHash = localStorage.getItem('t20_last_exported_hash') || null;
-                this.populateSkills();
-                this.updateSkills();
                 console.log('Ficha carregada do localStorage:', this.character);
                 return true;
             }
