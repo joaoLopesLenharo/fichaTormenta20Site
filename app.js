@@ -540,7 +540,7 @@ class TormentaCharacterSheet {
                     this.character.pericias.oficios.forEach((oficio, idx) => {
                         // Cálculo do zero
                         const attributeModifier = this.getAttributeModifier(oficio.atributo);
-                        const halfLevel = Math.floor(this.character.nivel / 2);
+                        const halfLevel = Math.floor(this.getTotalLevel() / 2);
                         const trainingBonus = oficio.treinada ? this.getTrainingBonus() : 0;
                         const bonusExtra = (typeof oficio.bonus === 'number') ? oficio.bonus : 0;
                         const total = halfLevel + attributeModifier + trainingBonus + bonusExtra;
@@ -554,7 +554,7 @@ class TormentaCharacterSheet {
                     // Usar atributo personalizado se existir
                     const attr = this.character.pericias[skillName]?.atributo || skillData.atributo;
                     const attributeModifier = this.getAttributeModifier(attr);
-                    const halfLevel = Math.floor(this.character.nivel / 2);
+                    const halfLevel = Math.floor(this.getTotalLevel() / 2);
                     const isTrainedInCharacter = this.character.pericias[skillName]?.treinada || false;
                     const trainingBonus = isTrainedInCharacter ? this.getTrainingBonus() : 0;
                     let bonusExtra = this.character.pericias[skillName]?.bonusExtra;
@@ -1585,41 +1585,53 @@ class TormentaCharacterSheet {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e) => {
-            this.character.foto = e.target.result;
+            this.character.foto = {
+                src: e.target.result,
+                srcOriginal: e.target.result,
+                zoom: 1,
+                offsetX: 0,
+                offsetY: 0
+            };
             this.updatePhotoUI();
+            this.markDirty();
+            this.saveToLocalStorage();
         };
         reader.readAsDataURL(file);
     }
 
     updatePhotoUI() {
         const photo = document.getElementById('character-photo');
-        const zoomSlider = document.getElementById('zoomSlider');
-        const zoomControls = document.querySelector('.zoom-controls');
-        const removeBtn = document.getElementById('removePhotoBtn');
+        if (photo) {
+            photo.style.objectFit = 'contain';
+        }
         if (this.character.foto && (this.character.foto.srcOriginal || this.character.foto.src)) {
-            // Sempre usar srcOriginal se existir
             const src = this.character.foto.srcOriginal || this.character.foto.src;
             photo.src = src;
             photo.style.display = 'block';
-            // Usar os valores salvos de zoom e offset
             const zoom = (typeof this.character.foto.zoom === 'number') ? this.character.foto.zoom : 1;
             const x = (typeof this.character.foto.offsetX === 'number') ? this.character.foto.offsetX : 0;
             const y = (typeof this.character.foto.offsetY === 'number') ? this.character.foto.offsetY : 0;
+            // Centralizar e mostrar a imagem inteira por padrão
             if (zoom === 1 && x === 0 && y === 0) {
                 photo.style.transform = 'none';
             } else {
-                photo.style.transform = `translate(${x * 100}%, ${y * 100}%) scale(${zoom})`;
+                // Aplicar translate e scale apenas se houver ajuste
+                const circle = document.getElementById('character-photo-circle');
+                if (circle && photo.complete) {
+                    const circleRect = circle.getBoundingClientRect();
+                    const imgRect = photo.getBoundingClientRect();
+                    const extraW = Math.max(0, imgRect.width - circleRect.width);
+                    const extraH = Math.max(0, imgRect.height - circleRect.height);
+                    const tx = x * extraW;
+                    const ty = y * extraH;
+                    photo.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
+                } else {
+                    photo.style.transform = `translate(${x * 100}%, ${y * 100}%) scale(${zoom})`;
+                }
             }
-            if (zoomSlider) {
-                zoomSlider.value = zoom;
-            }
-            if (zoomControls) zoomControls.style.display = 'flex';
-            if (removeBtn) removeBtn.style.display = 'inline-flex';
         } else {
             photo.src = '';
             photo.style.display = 'none';
-            if (zoomControls) zoomControls.style.display = 'none';
-            if (removeBtn) removeBtn.style.display = 'none';
         }
     }
 
@@ -1757,19 +1769,14 @@ class TormentaCharacterSheet {
             const data = localStorage.getItem('t20_last_character');
             if (data) {
                 const parsed = JSON.parse(data);
-                // Zerar bonus das pericias antes de recalcular
-                if (parsed.pericias) {
-                    Object.keys(parsed.pericias).forEach(skill => {
-                        if (parsed.pericias[skill] && typeof parsed.pericias[skill] === 'object') {
-                            parsed.pericias[skill].bonus = 0;
-                        }
-                    });
-                }
+                // Remover o trecho que zera parsed.pericias[skill].bonus
+                // O bonus deve ser restaurado do localStorage como salvo
                 this.importCharacterData(parsed);
                 this.isDirty = false;
                 this.lastExportedHash = localStorage.getItem('t20_last_exported_hash') || null;
-                this.character = parsed;
-                console.log('Ficha carregada do localStorage:', parsed);
+                this.populateSkills();
+                this.updateSkills();
+                console.log('Ficha carregada do localStorage:', this.character);
                 return true;
             }
         } catch (e) {
@@ -1790,23 +1797,38 @@ class TormentaCharacterSheet {
         const circle = document.getElementById('photo-edit-circle');
         const uploadBtn = document.getElementById('photoEditUploadBtn');
         const fileInput = document.getElementById('photoEditInput');
-        const zoomSlider = document.getElementById('photoEditZoomSlider');
-        const zoomInBtn = document.getElementById('photoEditZoomInBtn');
-        const zoomOutBtn = document.getElementById('photoEditZoomOutBtn');
+        // Remover slider de zoom e botões de zoom
+        // const zoomSlider = document.getElementById('photoEditZoomSlider');
+        // const zoomInBtn = document.getElementById('photoEditZoomInBtn');
+        // const zoomOutBtn = document.getElementById('photoEditZoomOutBtn');
         const resetBtn = document.getElementById('photoEditResetBtn');
         const removeBtn = document.getElementById('photoEditRemoveBtn');
         const saveBtn = document.getElementById('photoEditSaveBtn');
         const cancelBtn = document.getElementById('photoEditCancelBtn');
+        // Dica dinâmica
+        const instructions = modalContent.querySelector('.photo-edit-instructions');
         // Estado temporário de edição
         let tempSrc = null;
         let tempZoom = 1;
         let tempOffsetX = 0;
         let tempOffsetY = 0;
+        // Detectar mobile
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        }
+        function updateInstructions() {
+            if (instructions) {
+                if (isMobile()) {
+                    instructions.textContent = 'Arraste para ajustar a posição. Use o gesto de pinça para dar zoom. Clique em "Adicionar ou alterar foto" para trocar a imagem.';
+                } else {
+                    instructions.textContent = 'Arraste para ajustar a posição. Use o scroll do mouse para dar zoom. Clique em "Adicionar ou alterar foto" para trocar a imagem.';
+                }
+            }
+        }
         // Abrir modal ao clicar no lápis
         if (editBtn) {
             editBtn.onclick = () => {
                 if (!this.character.foto || !(this.character.foto.srcOriginal || this.character.foto.src)) {
-                    // Se não houver foto, pedir upload
                     tempSrc = null;
                     tempZoom = 1;
                     tempOffsetX = 0;
@@ -1822,7 +1844,7 @@ class TormentaCharacterSheet {
                     img.style.display = 'block';
                     updateImgTransform();
                 }
-                zoomSlider.value = tempZoom;
+                updateInstructions();
                 modal.style.display = 'flex';
             };
         }
@@ -1845,32 +1867,15 @@ class TormentaCharacterSheet {
                 tempZoom = 1;
                 tempOffsetX = 0;
                 tempOffsetY = 0;
-                zoomSlider.value = 1;
                 updateImgTransform();
             };
             reader.readAsDataURL(file);
-        };
-        // Zoom
-        if (zoomSlider) zoomSlider.oninput = (e) => {
-            tempZoom = parseFloat(e.target.value);
-            updateImgTransform();
-        };
-        if (zoomInBtn) zoomInBtn.onclick = () => {
-            tempZoom = Math.min(3, tempZoom + 0.1);
-            zoomSlider.value = tempZoom.toFixed(2);
-            updateImgTransform();
-        };
-        if (zoomOutBtn) zoomOutBtn.onclick = () => {
-            tempZoom = Math.max(1, tempZoom - 0.1);
-            zoomSlider.value = tempZoom.toFixed(2);
-            updateImgTransform();
         };
         // Resetar posição
         if (resetBtn) resetBtn.onclick = () => {
             tempZoom = 1;
             tempOffsetX = 0;
             tempOffsetY = 0;
-            zoomSlider.value = 1;
             updateImgTransform();
         };
         // Remover foto
@@ -1881,7 +1886,6 @@ class TormentaCharacterSheet {
             tempZoom = 1;
             tempOffsetX = 0;
             tempOffsetY = 0;
-            zoomSlider.value = 1;
             updateImgTransform();
         };
         // Arrastar imagem
@@ -1911,11 +1915,8 @@ class TormentaCharacterSheet {
             // Limite dinâmico baseado no tamanho exibido da imagem (contain + zoom)
             let maxOffsetX = 0, maxOffsetY = 0;
             if (img && circle) {
-                // Tamanho do círculo
                 const circleRect = circle.getBoundingClientRect();
-                // Tamanho exibido da imagem
                 const imgRect = img.getBoundingClientRect();
-                // O quanto a imagem "sobra" em cada eixo
                 maxOffsetX = Math.max(0, (imgRect.width - circleRect.width) / (2 * circleRect.width));
                 maxOffsetY = Math.max(0, (imgRect.height - circleRect.height) / (2 * circleRect.height));
             }
@@ -1935,18 +1936,68 @@ class TormentaCharacterSheet {
             circle.addEventListener('mousedown', onPointerDown);
             circle.addEventListener('touchstart', onPointerDown);
         }
+        // Zoom com scroll do mouse (desktop)
+        if (circle) {
+            circle.addEventListener('wheel', function(e) {
+                if (!tempSrc) return;
+                e.preventDefault();
+                let delta = e.deltaY < 0 ? 0.08 : -0.08;
+                tempZoom = Math.max(1, Math.min(3, tempZoom + delta));
+                updateImgTransform();
+            }, { passive: false });
+        }
+        // Zoom com gesto de pinça (mobile)
+        let lastPinchDist = null;
+        if (circle) {
+            circle.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 2) {
+                    lastPinchDist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                }
+            });
+            circle.addEventListener('touchmove', function(e) {
+                if (e.touches.length === 2 && lastPinchDist !== null) {
+                    e.preventDefault();
+                    const newDist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    let scaleChange = (newDist - lastPinchDist) / 120; // Sensibilidade
+                    tempZoom = Math.max(1, Math.min(3, tempZoom + scaleChange));
+                    lastPinchDist = newDist;
+                    updateImgTransform();
+                }
+            }, { passive: false });
+            circle.addEventListener('touchend', function(e) {
+                if (e.touches.length < 2) {
+                    lastPinchDist = null;
+                }
+            });
+        }
         function updateImgTransform() {
             if (!img) return;
             if (!tempSrc) {
                 img.style.transform = 'none';
                 return;
             }
-            if (tempZoom === 1 && tempOffsetX === 0 && tempOffsetY === 0) {
-                img.style.transform = 'none';
+            const circle = document.getElementById('photo-edit-circle');
+            if (circle && img.complete) {
+                const circleRect = circle.getBoundingClientRect();
+                const imgRect = img.getBoundingClientRect();
+                const extraW = Math.max(0, imgRect.width - circleRect.width);
+                const extraH = Math.max(0, imgRect.height - circleRect.height);
+                const tx = tempOffsetX * extraW;
+                const ty = tempOffsetY * extraH;
+                img.style.transform = `translate(${tx}px, ${ty}px) scale(${tempZoom})`;
             } else {
-                img.style.transform = `translate(${tempOffsetX * 100}%, ${tempOffsetY * 100}%) scale(${tempZoom})`;
+                if (tempZoom === 1 && tempOffsetX === 0 && tempOffsetY === 0) {
+                    img.style.transform = 'none';
+                } else {
+                    img.style.transform = `translate(${tempOffsetX * 100}%, ${tempOffsetY * 100}%) scale(${tempZoom})`;
+                }
             }
-            // Garantir que o botão de upload fique acima da imagem
             if (uploadBtn) uploadBtn.style.zIndex = 2001;
         }
         // Salvar ajustes
@@ -1956,6 +2007,7 @@ class TormentaCharacterSheet {
                 closeModal();
                 return;
             }
+            // Salvar os valores ajustados no objeto foto
             this.character.foto = {
                 src: tempSrc,
                 srcOriginal: tempSrc,
@@ -1963,20 +2015,22 @@ class TormentaCharacterSheet {
                 offsetX: tempOffsetX,
                 offsetY: tempOffsetY
             };
-            this.photoZoom = tempZoom;
-            this.photoOffsetX = tempOffsetX;
-            this.photoOffsetY = tempOffsetY;
             this.updatePhotoUI();
             this.markDirty();
+            this.saveToLocalStorage();
             closeModal();
         };
-        // Aspect ratio-aware drag limits
         let imgNaturalWidth = 1, imgNaturalHeight = 1;
         img.onload = function() {
             imgNaturalWidth = img.naturalWidth;
             imgNaturalHeight = img.naturalHeight;
             updateImgTransform();
         };
+        // Adicionar bind para input de foto principal
+        const mainPhotoInput = document.getElementById('photoInput');
+        if (mainPhotoInput) {
+            mainPhotoInput.onchange = (e) => this.handlePhotoUpload(e);
+        }
     }
     // --- Fim foto personagem ---
 
