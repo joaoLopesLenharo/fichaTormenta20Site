@@ -504,8 +504,9 @@ class TormentaCharacterSheet {
                     if (!this.character.pericias[skillName]) {
                         this.character.pericias[skillName] = {};
                     }
-                    // CORREÇÃO: Não salvar o total calculado em 'bonus'
-                    // this.character.pericias[skillName].bonus = total; // <--- LINHA REMOVIDA
+                    // <<<< CORREÇÃO IMPORTANTE >>>>
+                    // A linha que salvava o total no campo 'bonus' foi removida.
+                    // this.character.pericias[skillName].bonus = total;
                     this.character.pericias[skillName].atributo = attr;
                 }
             });
@@ -1175,16 +1176,6 @@ class TormentaCharacterSheet {
 
             const characterData = data.character || data;
 
-            // *** CORREÇÃO DEFINITIVA ***
-            // Limpa o campo 'bonus' problemático de qualquer ficha antiga antes de processar
-            if (characterData.pericias) {
-                Object.keys(characterData.pericias).forEach(skillName => {
-                    if (characterData.pericias[skillName]) {
-                        delete characterData.pericias[skillName].bonus;
-                    }
-                });
-            }
-
             // Compatibilidade com fichas antigas
             if (characterData.pericias) {
                 const newSkills = this.getDefaultSkills();
@@ -1198,6 +1189,7 @@ class TormentaCharacterSheet {
                         if (found) skillName = found;
                     }
                     if (!(skillName in newSkills)) return; // Ignorar perícias não reconhecidas
+                    
                     if (!characterData.pericias[skillName]) characterData.pericias[skillName] = {};
                     
                     // Mapear campos antigos
@@ -1205,33 +1197,30 @@ class TormentaCharacterSheet {
                         characterData.pericias[skillName].treinada = oldData.treinada || false;
                         characterData.pericias[skillName].atributo = oldData.atributo || newSkills[skillName].atributo;
                         
-                        // Mapear bonus/penalidade para bonusExtra/desconto
-                        // Agora que 'bonus' foi deletado, isso não causará mais problemas.
-                        // Apenas o 'bonusExtra' real será lido.
-                        characterData.pericias[skillName].bonusExtra = (typeof oldData.bonusExtra !== 'undefined' && oldData.bonusExtra !== null)
-                            ? Number(oldData.bonusExtra)
-                            : 0;
+                        // <<<< CORREÇÃO IMPORTANTE >>>>
+                        // Prioriza o campo correto 'bonusExtra'.
+                        // Usa o campo legado 'bonus' apenas como fallback para fichas antigas.
+                        if (typeof oldData.bonusExtra !== 'undefined' && oldData.bonusExtra !== null) {
+                            characterData.pericias[skillName].bonusExtra = oldData.bonusExtra;
+                        } else if (typeof oldData.bonus !== 'undefined' && oldData.bonus !== null) {
+                            characterData.pericias[skillName].bonusExtra = oldData.bonus; // Fallback
+                        } else {
+                            characterData.pericias[skillName].bonusExtra = '';
+                        }
+
                         characterData.pericias[skillName].desconto = (typeof oldData.penalidade !== 'undefined' && oldData.penalidade !== null)
                             ? Number(oldData.penalidade)
-                            : (oldData.desconto || 0);
+                            : (oldData.desconto || '');
+                        
+                        // Apaga o campo 'bonus' legado para evitar problemas futuros.
+                        delete characterData.pericias[skillName].bonus;
                     }
                 });
                 
-                // Garantir que todas as perícias existam
+                // Garantir que todas as perícias existam no objeto final
                 Object.keys(newSkills).forEach(skillName => {
                     if (!characterData.pericias[skillName]) {
-                        characterData.pericias[skillName] = {
-                            treinada: false,
-                            atributo: newSkills[skillName].atributo,
-                            bonusExtra: '', // Iniciar como string vazia
-                            desconto: ''   // Iniciar como string vazia
-                        };
-                    } else {
-                        // Garantir campos obrigatórios
-                        if (typeof characterData.pericias[skillName].bonusExtra === 'undefined') characterData.pericias[skillName].bonusExtra = '';
-                        if (typeof characterData.pericias[skillName].desconto === 'undefined') characterData.pericias[skillName].desconto = '';
-                        if (typeof characterData.pericias[skillName].atributo === 'undefined') characterData.pericias[skillName].atributo = newSkills[skillName].atributo;
-                        if (typeof characterData.pericias[skillName].treinada === 'undefined') characterData.pericias[skillName].treinada = false;
+                        characterData.pericias[skillName] = { ...newSkills[skillName] };
                     }
                 });
             }
