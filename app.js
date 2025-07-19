@@ -118,73 +118,7 @@ class TormentaCharacterSheet {
     // Load sample data with error handling
     loadSampleData() {
         try {
-            const sampleData = {
-                "character": {
-                    "nome": "Alyssa Noctiveris",
-                    "nivel": 1,
-                    "raca": "Aggelus",
-                    "classes": [{"nome": "Healler", "nivel": 1}],
-                    "divindade": "Célestia",
-                    "tendencia": "Leal Bom",
-                    "origem": "Acólito",
-                    "atributos": {
-                        "forca": 8,
-                        "destreza": 10,
-                        "constituicao": 13,
-                        "inteligencia": 14,
-                        "sabedoria": 19,
-                        "carisma": 14
-                    },
-                    "recursos": {
-                        "vida": {"atual": 17, "maximo": 17, "cor": "#e53e3e"},
-                        "mana": {"atual": 5, "maximo": 7, "cor": "#3182ce"},
-                        "prana": {"atual": 0, "maximo": 0, "cor": "#9f7aea"},
-                        "recursos_extras": [
-                            {"nome": "Vigor", "atual": 10, "maximo": 10, "cor": "#38a169"},
-                            {"nome": "Sorte", "atual": 3, "maximo": 3, "cor": "#d69e2e"}
-                        ]
-                    },
-                    "defesa": 10,
-                    "deslocamento": 9,
-                    "pericias": {
-                        "Adestramento": {"treinada": true, "bonus": 4, "atributo": "carisma"},
-                        "Conhecimento": {"treinada": true, "bonus": 4, "atributo": "inteligencia"},
-                        "Cura": {"treinada": true, "bonus": 6, "atributo": "sabedoria"},
-                        "Iniciativa": {"treinada": true, "bonus": 2, "atributo": "destreza"},
-                        "Intuição": {"treinada": true, "bonus": 6, "atributo": "sabedoria"},
-                        "Percepção": {"treinada": true, "bonus": 6, "atributo": "sabedoria"},
-                        "Religião": {"treinada": true, "bonus": 6, "atributo": "sabedoria"},
-                        "Vontade": {"treinada": true, "bonus": 6, "atributo": "sabedoria"}
-                    },
-                    "inventario": {
-                        "itens": [
-                            {"nome": "Mochila e equipamentos", "tipo": "Equipamento", "quantidade": 1, "peso": 2.0},
-                            {"nome": "Adaga", "tipo": "Arma", "quantidade": 1, "peso": 0.5},
-                            {"nome": "Armadura de Couro", "tipo": "Armadura", "quantidade": 1, "peso": 7.0}
-                        ],
-                        "dinheiro": {"T$": 64, "PP": 0, "PO": 0, "PE": 0, "PC": 0}
-                    },
-                    "magias": {
-                        "arcana": {"1º": [], "2º": [], "3º": [], "4º": [], "5º": []},
-                        "divina": {
-                            "1º": [
-                                {"nome": "Santuário", "escola": "Abjuração", "execucao": "Padrão", "alcance": "Toque"},
-                                {"nome": "Benção", "escola": "Encantamento", "execucao": "Padrão", "alcance": "Curto"}
-                            ],
-                            "2º": [], "3º": [], "4º": [], "5º": []
-                        }
-                    },
-                    "habilidades": [
-                        {"nome": "Cura", "descricao": "Recupera 1d6+1 + mod. Sabedoria pontos de vida"},
-                        {"nome": "Herança Divina", "descricao": "Criatura do tipo espírito com visão no escuro"}
-                    ],
-                    "poderes": [
-                        {"nome": "Visão no Escuro", "tipo": "Raça", "descricao": "Visão no escuro"}
-                    ]
-                }
-            };
-
-            this.importCharacterData(sampleData);
+            // A função foi esvaziada para não carregar mais a ficha de exemplo.
         } catch (error) {
             console.error('Erro ao carregar dados de exemplo:', error);
             this.showError('Erro ao carregar dados de exemplo. Usando valores padrão.');
@@ -446,8 +380,8 @@ class TormentaCharacterSheet {
         // Garantir que bonus e desconto sejam sempre mostrados corretamente
         let bonus = this.character.pericias[skillName]?.bonusExtra;
         let desconto = this.character.pericias[skillName]?.desconto;
-        bonus = (bonus === undefined || bonus === null) ? 0 : bonus;
-        desconto = (desconto === undefined || desconto === null) ? 0 : desconto;
+        bonus = (bonus === undefined || bonus === null) ? '' : bonus;
+        desconto = (desconto === undefined || desconto === null) ? '' : desconto;
         skillDiv.innerHTML = `
             <div class="skill-name skill-name-block">${skillName}</div>
             <div class="skill-row">
@@ -570,8 +504,8 @@ class TormentaCharacterSheet {
                     if (!this.character.pericias[skillName]) {
                         this.character.pericias[skillName] = {};
                     }
-                    // Apenas sobrescreva o campo bonus, nunca use o valor anterior
-                    this.character.pericias[skillName].bonus = total;
+                    // CORREÇÃO: Não salvar o total calculado em 'bonus'
+                    // this.character.pericias[skillName].bonus = total; // <--- LINHA REMOVIDA
                     this.character.pericias[skillName].atributo = attr;
                 }
             });
@@ -1263,12 +1197,17 @@ class TormentaCharacterSheet {
                         characterData.pericias[skillName].treinada = oldData.treinada || false;
                         characterData.pericias[skillName].atributo = oldData.atributo || newSkills[skillName].atributo;
                         // Mapear bonus/penalidade para bonusExtra/desconto
-                        characterData.pericias[skillName].bonusExtra = (typeof oldData.bonus !== 'undefined' && oldData.bonus !== null)
-                            ? Number(oldData.bonus)
-                            : 0;
+                        // CORREÇÃO: Usar 'bonusExtra' e não sobrescrever com o campo 'bonus' antigo.
+                        if (typeof oldData.bonusExtra !== 'undefined') {
+                             characterData.pericias[skillName].bonusExtra = Number(oldData.bonusExtra);
+                        } else if (typeof oldData.bonus !== 'undefined') {
+                             characterData.pericias[skillName].bonusExtra = Number(oldData.bonus);
+                        } else {
+                            characterData.pericias[skillName].bonusExtra = 0;
+                        }
                         characterData.pericias[skillName].desconto = (typeof oldData.penalidade !== 'undefined' && oldData.penalidade !== null)
                             ? Number(oldData.penalidade)
-                            : 0;
+                            : (oldData.desconto || 0);
                     }
                 });
                 // Garantir que todas as perícias existam
@@ -1769,8 +1708,12 @@ class TormentaCharacterSheet {
             const data = localStorage.getItem('t20_last_character');
             if (data) {
                 const parsed = JSON.parse(data);
-                // Remover o trecho que zera parsed.pericias[skill].bonus
-                // O bonus deve ser restaurado do localStorage como salvo
+                // CORREÇÃO: Limpar o campo 'bonus' antigo para evitar sobrescrever o 'bonusExtra'
+                if (parsed.pericias) {
+                    Object.keys(parsed.pericias).forEach(skillName => {
+                        delete parsed.pericias[skillName].bonus;
+                    });
+                }
                 this.importCharacterData(parsed);
                 this.isDirty = false;
                 this.lastExportedHash = localStorage.getItem('t20_last_exported_hash') || null;
