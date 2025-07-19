@@ -1558,3 +1558,256 @@ select.form-control {
     margin-top: var(--space-16);
   }
 }
+
+/* --- Foto do personagem --- */
+.character-photo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: var(--space-16);
+}
+.character-photo-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#character-photo-circle {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-secondary);
+  border: 3px solid var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: var(--space-8);
+  box-shadow: 0 2px 8px rgba(33,128,141,0.07);
+}
+#character-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  cursor: grab;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: box-shadow 0.2s;
+}
+#character-photo.dragging {
+  cursor: grabbing;
+  box-shadow: 0 0 0 4px var(--color-primary);
+}
+.photo-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+}
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: 2px;
+}
+#zoomSlider {
+  width: 80px;
+}
+@media (max-width: 600px) {
+  #character-photo-circle {
+    width: 90px;
+    height: 90px;
+  }
+}
+
+/* --- Modal de edição de foto --- */
+.photo-edit-modal {
+  position: fixed;
+  z-index: 1000;
+  left: 0; top: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.photo-edit-modal-backdrop {
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 1;
+}
+.photo-edit-modal-content {
+  position: relative;
+  z-index: 2;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  padding: var(--space-24);
+  min-width: 340px;
+  max-width: 96vw;
+  max-height: 96vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.photo-edit-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.photo-edit-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 10px 0;
+}
+.zoom-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0;
+}
+.photo-edit-controls-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+.photo-edit-instructions {
+  font-size: 14px;
+  color: #aaa;
+  margin-top: 18px;
+  margin-bottom: 0;
+  text-align: center;
+  max-width: 340px;
+}
+#photo-edit-circle {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-secondary);
+  border: 3px solid var(--color-primary);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+#photo-edit-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  cursor: grab;
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: box-shadow 0.2s;
+}
+#photo-edit-img.dragging {
+  cursor: grabbing;
+  box-shadow: 0 0 0 4px var(--color-primary);
+}
+#editPhotoBtn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+  cursor: pointer;
+  z-index: 2000;
+  font-size: 1.3em;
+  border: 2px solid #fff;
+}
+/* Remover estilos antigos do botão sobreposto */
+.photo-edit-upload-btn {
+  display: none;
+}
+@media (max-width: 900px) {
+  .photo-edit-modal-content {
+    min-width: 0;
+    max-width: 98vw;
+    max-height: 98vh;
+    padding: 10px 4vw;
+    border-radius: 12px;
+  }
+  #photo-edit-circle {
+    width: 140px;
+    height: 140px;
+    margin-bottom: 8px;
+  }
+  .photo-edit-instructions {
+    font-size: 13px;
+    max-width: 90vw;
+    margin-top: 10px;
+  }
+  .photo-edit-controls-row {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  .zoom-controls {
+    width: 100%;
+    gap: 6px;
+  }
+  #photoEditZoomSlider {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+@media (max-width: 600px) {
+  .photo-edit-modal-content {
+    min-width: 0;
+    max-width: 100vw;
+    max-height: 100vh;
+    padding: 6px 2vw;
+    border-radius: 8px;
+  }
+  #photo-edit-circle {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 6px;
+  }
+  .photo-edit-instructions {
+    font-size: 12px;
+    max-width: 98vw;
+    margin-top: 6px;
+  }
+  .photo-edit-controls-row {
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  .zoom-controls {
+    width: 100%;
+    gap: 4px;
+  }
+  #photoEditZoomSlider {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .btn, .btn--sm, .btn--secondary {
+    font-size: 15px;
+    min-width: 0;
+    padding: 8px 10px;
+  }
+}
+/* Remover instrução da interface principal */
+.photo-instructions { display: none !important; }

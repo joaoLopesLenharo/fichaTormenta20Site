@@ -11,7 +11,23 @@
         <header class="header">
             <div class="header-content">
                 <h1>Ficha de Personagem - Tormenta 20</h1>
-                <!-- Removido campo de foto do personagem -->
+                <!-- Área da foto do personagem -->
+                <div class="character-photo-container">
+                    <div class="character-photo-wrapper">
+                        <div id="character-photo-circle" style="position:relative;">
+                            <img id="character-photo" src="" alt="Foto do personagem" style="display:none;" draggable="false">
+                            <button id="editPhotoBtn" type="button" style="position:absolute;bottom:8px;right:8px;background:var(--color-primary);color:#fff;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.12);cursor:pointer;z-index:2;">
+                                <span style="font-size:1.3em;">✏️</span>
+                            </button>
+                        </div>
+                        <div class="photo-controls">
+                            <input type="file" id="photoInput" accept="image/*" style="display:none;">
+                            <!-- Remover o antigo botão addPhotoBtn -->
+                            <div class="photo-instructions" style="font-size:12px; color:#888; margin-top:4px;">Arraste para ajustar a posição. Use o zoom.</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Fim área foto -->
                 <div class="header-actions">
                     <button class="btn btn--secondary" id="importBtn">
                         <span>📄</span> Importar JSON
@@ -19,6 +35,7 @@
                     <button class="btn btn--primary" id="exportBtn">
                         <span>💾</span> Exportar JSON
                     </button>
+                    <button class="btn btn--secondary" id="resetBtn">Zerar Ficha</button>
                     <button class="btn btn--secondary" id="themeToggleBtn" title="Alternar tema">
                         <span id="themeToggleIcon">🌙</span>
                     </button>
@@ -347,6 +364,37 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Modal de edição de foto -->
+    <div id="photoEditModal" class="photo-edit-modal" style="display:none;">
+      <div class="photo-edit-modal-backdrop"></div>
+      <div class="photo-edit-modal-content">
+        <h2>Editar Foto do Personagem</h2>
+        <div class="photo-edit-area" style="position:relative;display:flex;flex-direction:column;align-items:center;">
+          <div id="photo-edit-circle">
+            <img id="photo-edit-img" src="" alt="Foto original" draggable="false">
+          </div>
+          <input type="file" id="photoEditInput" accept="image/*" style="display:none;">
+          <div class="photo-edit-controls">
+            <div class="zoom-controls">
+              <button class="btn btn--sm" id="photoEditZoomOutBtn" type="button">-</button>
+              <input type="range" id="photoEditZoomSlider" min="1" max="3" step="0.01" value="1" style="width:80px;">
+              <button class="btn btn--sm" id="photoEditZoomInBtn" type="button">+</button>
+            </div>
+            <div class="photo-edit-controls-row">
+              <button class="btn btn--sm btn--secondary" id="photoEditResetBtn" type="button">Resetar Posição</button>
+              <button class="btn btn--sm btn--secondary" id="photoEditRemoveBtn" type="button">Remover Foto</button>
+              <button class="btn btn--sm btn--secondary" id="photoEditUploadBtn" type="button">Adicionar ou alterar foto</button>
+            </div>
+          </div>
+          <div class="photo-edit-instructions">Arraste para ajustar a posição. Use o zoom. Clique em "Adicionar ou alterar foto" para trocar a imagem.</div>
+        </div>
+        <div class="photo-edit-modal-actions">
+          <button class="btn btn--primary" id="photoEditSaveBtn" type="button">Salvar</button>
+          <button class="btn btn--secondary" id="photoEditCancelBtn" type="button">Cancelar</button>
+        </div>
+      </div>
     </div>
 
     <script src="app.js"></script>

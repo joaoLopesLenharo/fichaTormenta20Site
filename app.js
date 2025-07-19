@@ -1,22 +1,41 @@
 // Tormenta 20 Character Sheet Application
 class TormentaCharacterSheet {
     constructor() {
-        this.character = this.getDefaultCharacter();
+        // Tente carregar do localStorage primeiro
+        this.character = null;
         this.skills = this.getDefaultSkills();
+        this.isDirty = false; // Flag para alterações não exportadas
+        this.lastExportedHash = null; // Para saber se exportou
+        // Foto: variáveis de controle
+        this.photoZoom = 1;
+        this.photoOffsetX = 0;
+        this.photoOffsetY = 0;
+        this.isDraggingPhoto = false;
+        this.dragStart = { x: 0, y: 0 };
+        // Inicialização correta: só use default se não houver localStorage
+        const loaded = this.loadFromLocalStorage();
+        console.log('loadFromLocalStorage retornou:', loaded);
+        if (!loaded) {
+            this.character = this.getDefaultCharacter();
+            console.log('Nenhum dado salvo, usando ficha padrão');
+        } else {
+            console.log('Ficha restaurada do localStorage:', this.character);
+        }
         this.init();
     }
 
     // Initialize the application
     init() {
+        // Remover chamada a loadFromLocalStorage daqui, pois já foi feita no construtor
         this.bindEvents();
         this.populateSkills();
-        // Remover loadSampleData para iniciar zerado
         this.updateAllCalculations();
         this.renderCustomResources();
         this.renderAbilities();
         this.renderItems();
         this.renderSpells();
         this.renderPowers();
+        this.initPhotoUI();
     }
 
     // Get default character structure with validation
@@ -243,6 +262,8 @@ class TormentaCharacterSheet {
         try {
             this.character[field] = value;
             this.validateField(field, value);
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error(`Erro ao atualizar campo ${field}:`, error);
             this.showError(`Erro ao atualizar ${field}`);
@@ -255,6 +276,8 @@ class TormentaCharacterSheet {
             level = Math.max(1, Math.min(20, level));
             this.character.nivel = level;
             this.updateAllCalculations();
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error('Erro ao atualizar nível:', error);
             this.showError('Erro ao atualizar nível');
@@ -266,6 +289,8 @@ class TormentaCharacterSheet {
         try {
             this.character.classes = className ? [{ nome: className, nivel: this.character.nivel }] : [];
             this.updateAllCalculations();
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error('Erro ao atualizar classe:', error);
             this.showError('Erro ao atualizar classe');
@@ -284,6 +309,8 @@ class TormentaCharacterSheet {
             document.getElementById(`${attribute}-mod`).textContent = modifierText;
             
             this.updateAllCalculations();
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error(`Erro ao atualizar atributo ${attribute}:`, error);
             this.showError(`Erro ao atualizar ${attribute}`);
@@ -467,6 +494,7 @@ class TormentaCharacterSheet {
             }
             this.character.pericias[skillName].treinada = isTrained;
             this.updateSkills();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error(`Erro ao atualizar treinamento da perícia ${skillName}:`, error);
         }
@@ -491,7 +519,7 @@ class TormentaCharacterSheet {
         if (!this.character.pericias.oficios || !this.character.pericias.oficios[idx]) return;
         this.character.pericias.oficios[idx][prop] = value;
         this.updateSkills();
-        this.populateSkills();
+        this.saveToLocalStorage();
     }
 
     // Remover ofício personalizado
@@ -510,10 +538,12 @@ class TormentaCharacterSheet {
                     // Atualizar todos os ofícios personalizados
                     if (!this.character.pericias.oficios) this.character.pericias.oficios = [];
                     this.character.pericias.oficios.forEach((oficio, idx) => {
+                        // Cálculo do zero
                         const attributeModifier = this.getAttributeModifier(oficio.atributo);
                         const halfLevel = Math.floor(this.character.nivel / 2);
                         const trainingBonus = oficio.treinada ? this.getTrainingBonus() : 0;
-                        const total = halfLevel + attributeModifier + trainingBonus + (parseInt(oficio.bonus)||0);
+                        const bonusExtra = (typeof oficio.bonus === 'number') ? oficio.bonus : 0;
+                        const total = halfLevel + attributeModifier + trainingBonus + bonusExtra;
                         oficio.total = total;
                         const totalElement = document.getElementById(`oficio-total-${idx}`);
                         if (totalElement) {
@@ -521,7 +551,9 @@ class TormentaCharacterSheet {
                         }
                     });
                 } else {
-                    const attributeModifier = this.getAttributeModifier(skillData.atributo);
+                    // Usar atributo personalizado se existir
+                    const attr = this.character.pericias[skillName]?.atributo || skillData.atributo;
+                    const attributeModifier = this.getAttributeModifier(attr);
                     const halfLevel = Math.floor(this.character.nivel / 2);
                     const isTrainedInCharacter = this.character.pericias[skillName]?.treinada || false;
                     const trainingBonus = isTrainedInCharacter ? this.getTrainingBonus() : 0;
@@ -529,6 +561,7 @@ class TormentaCharacterSheet {
                     let desconto = this.character.pericias[skillName]?.desconto;
                     bonusExtra = (bonusExtra === '' || bonusExtra === undefined) ? 0 : Number(bonusExtra);
                     desconto = (desconto === '' || desconto === undefined) ? 0 : Number(desconto);
+                    // Cálculo do zero, sem acumular e sem usar bonus anterior
                     const total = halfLevel + attributeModifier + trainingBonus + bonusExtra - desconto;
                     const totalElement = document.getElementById(`skill-total-${skillName}`);
                     if (totalElement) {
@@ -537,8 +570,9 @@ class TormentaCharacterSheet {
                     if (!this.character.pericias[skillName]) {
                         this.character.pericias[skillName] = {};
                     }
+                    // Apenas sobrescreva o campo bonus, nunca use o valor anterior
                     this.character.pericias[skillName].bonus = total;
-                    this.character.pericias[skillName].atributo = skillData.atributo;
+                    this.character.pericias[skillName].atributo = attr;
                 }
             });
         } catch (error) {
@@ -551,6 +585,8 @@ class TormentaCharacterSheet {
         try {
             this.character.recursos[resource][type] = Math.max(0, value);
             this.updateResourceBar(resource);
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error(`Erro ao atualizar recurso ${resource}:`, error);
         }
@@ -561,6 +597,8 @@ class TormentaCharacterSheet {
         try {
             this.character.recursos[resource].cor = color;
             this.updateResourceBar(resource);
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error(`Erro ao atualizar cor do recurso ${resource}:`, error);
         }
@@ -663,6 +701,8 @@ class TormentaCharacterSheet {
         try {
             if (this.character.recursos.recursos_extras[index]) {
                 this.character.recursos.recursos_extras[index].nome = name;
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao atualizar nome do recurso personalizado:', error);
@@ -675,6 +715,8 @@ class TormentaCharacterSheet {
             if (this.character.recursos.recursos_extras[index]) {
                 this.character.recursos.recursos_extras[index][type] = Math.max(0, value);
                 this.updateCustomResourceBar(index);
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao atualizar valor do recurso personalizado:', error);
@@ -687,6 +729,8 @@ class TormentaCharacterSheet {
             if (this.character.recursos.recursos_extras[index]) {
                 this.character.recursos.recursos_extras[index].cor = color;
                 this.updateCustomResourceBar(index);
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao atualizar cor do recurso personalizado:', error);
@@ -716,6 +760,8 @@ class TormentaCharacterSheet {
             if (this.character.recursos.recursos_extras && this.character.recursos.recursos_extras[index]) {
                 this.character.recursos.recursos_extras.splice(index, 1);
                 this.renderCustomResources();
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao remover recurso personalizado:', error);
@@ -727,6 +773,8 @@ class TormentaCharacterSheet {
         try {
             const key = coinType === 'TS' ? 'T$' : coinType;
             this.character.inventario.dinheiro[key] = Math.max(0, value);
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error(`Erro ao atualizar dinheiro ${coinType}:`, error);
         }
@@ -742,6 +790,8 @@ class TormentaCharacterSheet {
             
             this.character.habilidades.push(ability);
             this.renderAbilities();
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error('Erro ao adicionar habilidade:', error);
         }
@@ -782,6 +832,8 @@ class TormentaCharacterSheet {
         try {
             if (this.character.habilidades[index]) {
                 this.character.habilidades[index].nome = name;
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao atualizar nome da habilidade:', error);
@@ -793,6 +845,8 @@ class TormentaCharacterSheet {
         try {
             if (this.character.habilidades[index]) {
                 this.character.habilidades[index].descricao = description;
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao atualizar descrição da habilidade:', error);
@@ -805,6 +859,8 @@ class TormentaCharacterSheet {
             if (this.character.habilidades[index]) {
                 this.character.habilidades.splice(index, 1);
                 this.renderAbilities();
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao remover habilidade:', error);
@@ -826,6 +882,8 @@ class TormentaCharacterSheet {
             };
             this.character.inventario.itens.push(item);
             this.renderItems();
+            this.markDirty();
+            this.saveToLocalStorage();
         } catch (error) {
             console.error('Erro ao adicionar item:', error);
         }
@@ -886,6 +944,8 @@ class TormentaCharacterSheet {
         try {
             if (this.character.inventario.itens[index]) {
                 this.character.inventario.itens[index][property] = value;
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao atualizar propriedade do item:', error);
@@ -898,6 +958,8 @@ class TormentaCharacterSheet {
             if (this.character.inventario.itens[index]) {
                 this.character.inventario.itens.splice(index, 1);
                 this.renderItems();
+                this.markDirty();
+                this.saveToLocalStorage();
             }
         } catch (error) {
             console.error('Erro ao remover item:', error);
@@ -1037,6 +1099,7 @@ class TormentaCharacterSheet {
             const circleKey = `${circle}º`;
             if (this.character.magias[type][circleKey] && this.character.magias[type][circleKey][index]) {
                 this.character.magias[type][circleKey][index][property] = value;
+                this.markDirty();
             }
         } catch (error) {
             console.error('Erro ao atualizar propriedade da magia:', error);
@@ -1050,6 +1113,7 @@ class TormentaCharacterSheet {
             if (this.character.magias[type][circleKey] && this.character.magias[type][circleKey][index]) {
                 this.character.magias[type][circleKey].splice(index, 1);
                 this.renderSpells();
+                this.markDirty();
             }
         } catch (error) {
             console.error('Erro ao remover magia:', error);
@@ -1061,20 +1125,36 @@ class TormentaCharacterSheet {
         if (!this.character.poderes) this.character.poderes = [];
         this.character.poderes.push({ nome: 'Novo Poder', tipo: 'Classe', descricao: '' });
         this.renderPowers();
+        this.markDirty();
+        this.saveToLocalStorage();
     }
     updatePowerName(idx, value) {
-        if (this.character.poderes[idx]) this.character.poderes[idx].nome = value;
+        if (this.character.poderes[idx]) {
+            this.character.poderes[idx].nome = value;
+            this.markDirty();
+            this.saveToLocalStorage();
+        }
     }
     updatePowerType(idx, value) {
-        if (this.character.poderes[idx]) this.character.poderes[idx].tipo = value;
+        if (this.character.poderes[idx]) {
+            this.character.poderes[idx].tipo = value;
+            this.markDirty();
+            this.saveToLocalStorage();
+        }
     }
     updatePowerDescription(idx, value) {
-        if (this.character.poderes[idx]) this.character.poderes[idx].descricao = value;
+        if (this.character.poderes[idx]) {
+            this.character.poderes[idx].descricao = value;
+            this.markDirty();
+            this.saveToLocalStorage();
+        }
     }
     removePower(idx) {
         if (this.character.poderes[idx]) {
             this.character.poderes.splice(idx, 1);
             this.renderPowers();
+            this.markDirty();
+            this.saveToLocalStorage();
         }
     }
     renderPowers() {
@@ -1128,6 +1208,12 @@ class TormentaCharacterSheet {
 
     // Handle file import
     handleFileImport(event) {
+        if (this.isDirty) {
+            if (!confirm('Você fez alterações na ficha que não foram exportadas. Tem certeza que deseja importar outra ficha e sobrescrever?')) {
+                event.target.value = '';
+                return;
+            }
+        }
         const file = event.target.files[0];
         if (!file) return;
 
@@ -1228,6 +1314,13 @@ class TormentaCharacterSheet {
                 if (!this.character.pericias[skillName]) this.character.pericias[skillName] = {};
                 if (typeof this.character.pericias[skillName].bonusExtra === 'undefined') this.character.pericias[skillName].bonusExtra = '';
                 if (typeof this.character.pericias[skillName].desconto === 'undefined') this.character.pericias[skillName].desconto = '';
+                // Garantir que exporte como número ou vazio
+                if (this.character.pericias[skillName].bonusExtra === '') this.character.pericias[skillName].bonusExtra = '';
+                else this.character.pericias[skillName].bonusExtra = Number(this.character.pericias[skillName].bonusExtra);
+                if (this.character.pericias[skillName].desconto === '') this.character.pericias[skillName].desconto = '';
+                else this.character.pericias[skillName].desconto = Number(this.character.pericias[skillName].desconto);
+                // Garantir que o atributo seja restaurado corretamente
+                if (typeof this.character.pericias[skillName].atributo === 'undefined') this.character.pericias[skillName].atributo = skillData.atributo;
             });
             // Update UI
             this.updateUI();
@@ -1243,6 +1336,50 @@ class TormentaCharacterSheet {
             this.renderItems();
             this.renderSpells();
             this.renderPowers();
+            
+            this.isDirty = false;
+            this.lastExportedHash = this.getCharacterHash();
+            this.saveToLocalStorage();
+            
+            // Foto: garantir estrutura e compatibilidade
+            if (characterData.foto) {
+                if (typeof characterData.foto === 'string' && characterData.foto.length > 10) {
+                    // Compatibilidade antiga: só base64
+                    this.character.foto = {
+                        src: characterData.foto,
+                        srcOriginal: characterData.foto,
+                        zoom: 1,
+                        offsetX: 0,
+                        offsetY: 0
+                    };
+                } else if (typeof characterData.foto === 'object' && (characterData.foto.srcOriginal || characterData.foto.src)) {
+                    this.character.foto = {
+                        src: characterData.foto.src || characterData.foto.srcOriginal,
+                        srcOriginal: characterData.foto.srcOriginal || characterData.foto.src,
+                        zoom: (typeof characterData.foto.zoom === 'number') ? characterData.foto.zoom : 1,
+                        offsetX: (typeof characterData.foto.offsetX === 'number') ? characterData.foto.offsetX : 0,
+                        offsetY: (typeof characterData.foto.offsetY === 'number') ? characterData.foto.offsetY : 0
+                    };
+                } else {
+                    this.character.foto = null;
+                }
+                if (this.character.foto) {
+                    this.photoZoom = this.character.foto.zoom;
+                    this.photoOffsetX = this.character.foto.offsetX;
+                    this.photoOffsetY = this.character.foto.offsetY;
+                } else {
+                    this.photoZoom = 1;
+                    this.photoOffsetX = 0;
+                    this.photoOffsetY = 0;
+                }
+            } else {
+                this.character.foto = null;
+                this.photoZoom = 1;
+                this.photoOffsetX = 0;
+                this.photoOffsetY = 0;
+            }
+            // Atualizar foto
+            this.updatePhotoUI();
             
         } catch (error) {
             console.error('Erro na importação:', error);
@@ -1362,6 +1499,9 @@ class TormentaCharacterSheet {
                     powersContainer.appendChild(div);
                 });
             }
+
+            // Foto do personagem
+            this.updatePhotoUI();
         } catch (error) {
             console.error('Erro ao atualizar UI:', error);
             this.showError('Erro ao atualizar interface');
@@ -1382,20 +1522,32 @@ class TormentaCharacterSheet {
                 if (this.character.pericias[skillName].desconto === '') this.character.pericias[skillName].desconto = '';
                 else this.character.pericias[skillName].desconto = Number(this.character.pericias[skillName].desconto);
             });
+            // Foto: garantir que srcOriginal seja exportado
+            let fotoExport = null;
+            if (this.character.foto && (this.character.foto.srcOriginal || this.character.foto.src)) {
+                fotoExport = {
+                    src: this.character.foto.src || this.character.foto.srcOriginal,
+                    srcOriginal: this.character.foto.srcOriginal || this.character.foto.src,
+                    zoom: (typeof this.character.foto.zoom === 'number') ? this.character.foto.zoom : 1,
+                    offsetX: (typeof this.character.foto.offsetX === 'number') ? this.character.foto.offsetX : 0,
+                    offsetY: (typeof this.character.foto.offsetY === 'number') ? this.character.foto.offsetY : 0
+                };
+            }
             const exportData = {
-                character: this.character,
+                character: {
+                    ...this.character,
+                    foto: fotoExport
+                },
                 validation_notes: "Exported from Tormenta 20 Character Sheet"
             };
-            
             const dataStr = JSON.stringify(exportData, null, 2);
             const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            
             const link = document.createElement('a');
             link.href = URL.createObjectURL(dataBlob);
             link.download = `${this.character.nome || 'personagem'}_tormenta20.json`;
             link.click();
-            
             this.showSuccess('Personagem exportado com sucesso!');
+            this.markClean();
         } catch (error) {
             console.error('Erro ao exportar:', error);
             this.showError('Erro ao exportar personagem');
@@ -1440,16 +1592,34 @@ class TormentaCharacterSheet {
     }
 
     updatePhotoUI() {
-        const img = document.getElementById('character-photo');
+        const photo = document.getElementById('character-photo');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const zoomControls = document.querySelector('.zoom-controls');
         const removeBtn = document.getElementById('removePhotoBtn');
-        if (this.character.foto) {
-            img.src = this.character.foto;
-            img.style.display = 'block';
-            removeBtn.style.display = 'inline-flex';
+        if (this.character.foto && (this.character.foto.srcOriginal || this.character.foto.src)) {
+            // Sempre usar srcOriginal se existir
+            const src = this.character.foto.srcOriginal || this.character.foto.src;
+            photo.src = src;
+            photo.style.display = 'block';
+            // Usar os valores salvos de zoom e offset
+            const zoom = (typeof this.character.foto.zoom === 'number') ? this.character.foto.zoom : 1;
+            const x = (typeof this.character.foto.offsetX === 'number') ? this.character.foto.offsetX : 0;
+            const y = (typeof this.character.foto.offsetY === 'number') ? this.character.foto.offsetY : 0;
+            if (zoom === 1 && x === 0 && y === 0) {
+                photo.style.transform = 'none';
+            } else {
+                photo.style.transform = `translate(${x * 100}%, ${y * 100}%) scale(${zoom})`;
+            }
+            if (zoomSlider) {
+                zoomSlider.value = zoom;
+            }
+            if (zoomControls) zoomControls.style.display = 'flex';
+            if (removeBtn) removeBtn.style.display = 'inline-flex';
         } else {
-            img.src = '';
-            img.style.display = 'none';
-            removeBtn.style.display = 'none';
+            photo.src = '';
+            photo.style.display = 'none';
+            if (zoomControls) zoomControls.style.display = 'none';
+            if (removeBtn) removeBtn.style.display = 'none';
         }
     }
 
@@ -1463,16 +1633,22 @@ class TormentaCharacterSheet {
         if (!this.character.classes) this.character.classes = [];
         this.character.classes.push({nome: '', nivel: 1});
         this.updateUI();
+        this.markDirty();
+        this.saveToLocalStorage();
     }
     updateClassName(idx, value) {
         if (this.character.classes[idx]) {
             this.character.classes[idx].nome = value;
+            this.markDirty();
+            this.saveToLocalStorage();
         }
     }
     updateClassLevel(idx, value) {
         if (this.character.classes[idx]) {
             this.character.classes[idx].nivel = value;
             this.updateAllCalculations();
+            this.markDirty();
+            this.saveToLocalStorage();
         }
     }
     removeClass(idx) {
@@ -1480,6 +1656,8 @@ class TormentaCharacterSheet {
             this.character.classes.splice(idx, 1);
             this.updateUI();
             this.updateAllCalculations();
+            this.markDirty();
+            this.saveToLocalStorage();
         }
     }
     // Nível total do personagem
@@ -1503,6 +1681,7 @@ class TormentaCharacterSheet {
             this.character.pericias[skillName].bonusExtra = Number(value);
         }
         this.updateSkills();
+        this.saveToLocalStorage();
         // Atualizar input e total imediatamente
         const input = document.querySelector(`.skill-item [name='bonus-${skillName}']`);
         if (input) input.value = value;
@@ -1529,6 +1708,7 @@ class TormentaCharacterSheet {
             this.character.pericias[skillName].desconto = Number(value);
         }
         this.updateSkills();
+        this.saveToLocalStorage();
         // Atualizar input e total imediatamente
         const input = document.querySelector(`.skill-item [name='desconto-${skillName}']`);
         if (input) input.value = value;
@@ -1546,6 +1726,268 @@ class TormentaCharacterSheet {
             totalElement.textContent = total >= 0 ? `+${total}` : `${total}`;
         }
     }
+
+    // --- Dirty State e Persistência ---
+    markDirty() {
+        this.isDirty = true;
+        this.saveToLocalStorage();
+    }
+    markClean() {
+        this.isDirty = false;
+        this.lastExportedHash = this.getCharacterHash();
+        this.saveToLocalStorage();
+    }
+    getCharacterHash() {
+        // Simples hash para comparar exportação
+        try {
+            return btoa(unescape(encodeURIComponent(JSON.stringify(this.character))));
+        } catch {
+            return '';
+        }
+    }
+    saveToLocalStorage() {
+        try {
+            // Salvar o objeto completo, incluindo foto
+            localStorage.setItem('t20_last_character', JSON.stringify(this.character));
+            localStorage.setItem('t20_last_exported_hash', this.lastExportedHash || '');
+        } catch {}
+    }
+    loadFromLocalStorage() {
+        try {
+            const data = localStorage.getItem('t20_last_character');
+            if (data) {
+                const parsed = JSON.parse(data);
+                // Zerar bonus das pericias antes de recalcular
+                if (parsed.pericias) {
+                    Object.keys(parsed.pericias).forEach(skill => {
+                        if (parsed.pericias[skill] && typeof parsed.pericias[skill] === 'object') {
+                            parsed.pericias[skill].bonus = 0;
+                        }
+                    });
+                }
+                this.importCharacterData(parsed);
+                this.isDirty = false;
+                this.lastExportedHash = localStorage.getItem('t20_last_exported_hash') || null;
+                this.character = parsed;
+                console.log('Ficha carregada do localStorage:', parsed);
+                return true;
+            }
+        } catch (e) {
+            console.error('Erro ao carregar do localStorage:', e);
+        }
+        return false;
+    }
+
+    // --- Foto do personagem ---
+    initPhotoUI() {
+        const editBtn = document.getElementById('editPhotoBtn');
+        // Remover controles da interface principal (ficam só no modal)
+        // Modal elements
+        const modal = document.getElementById('photoEditModal');
+        const modalBackdrop = document.querySelector('.photo-edit-modal-backdrop');
+        const modalContent = document.querySelector('.photo-edit-modal-content');
+        const img = document.getElementById('photo-edit-img');
+        const circle = document.getElementById('photo-edit-circle');
+        const uploadBtn = document.getElementById('photoEditUploadBtn');
+        const fileInput = document.getElementById('photoEditInput');
+        const zoomSlider = document.getElementById('photoEditZoomSlider');
+        const zoomInBtn = document.getElementById('photoEditZoomInBtn');
+        const zoomOutBtn = document.getElementById('photoEditZoomOutBtn');
+        const resetBtn = document.getElementById('photoEditResetBtn');
+        const removeBtn = document.getElementById('photoEditRemoveBtn');
+        const saveBtn = document.getElementById('photoEditSaveBtn');
+        const cancelBtn = document.getElementById('photoEditCancelBtn');
+        // Estado temporário de edição
+        let tempSrc = null;
+        let tempZoom = 1;
+        let tempOffsetX = 0;
+        let tempOffsetY = 0;
+        // Abrir modal ao clicar no lápis
+        if (editBtn) {
+            editBtn.onclick = () => {
+                if (!this.character.foto || !(this.character.foto.srcOriginal || this.character.foto.src)) {
+                    // Se não houver foto, pedir upload
+                    tempSrc = null;
+                    tempZoom = 1;
+                    tempOffsetX = 0;
+                    tempOffsetY = 0;
+                    img.src = '';
+                    img.style.display = 'none';
+                } else {
+                    tempSrc = this.character.foto.srcOriginal || this.character.foto.src;
+                    tempZoom = (typeof this.character.foto.zoom === 'number') ? this.character.foto.zoom : 1;
+                    tempOffsetX = (typeof this.character.foto.offsetX === 'number') ? this.character.foto.offsetX : 0;
+                    tempOffsetY = (typeof this.character.foto.offsetY === 'number') ? this.character.foto.offsetY : 0;
+                    img.src = tempSrc;
+                    img.style.display = 'block';
+                    updateImgTransform();
+                }
+                zoomSlider.value = tempZoom;
+                modal.style.display = 'flex';
+            };
+        }
+        // Fechar modal
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+        if (modalBackdrop) modalBackdrop.onclick = closeModal;
+        if (cancelBtn) cancelBtn.onclick = closeModal;
+        // Upload nova imagem
+        if (uploadBtn) uploadBtn.onclick = () => fileInput.click();
+        if (fileInput) fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                tempSrc = ev.target.result;
+                img.src = tempSrc;
+                img.style.display = 'block';
+                tempZoom = 1;
+                tempOffsetX = 0;
+                tempOffsetY = 0;
+                zoomSlider.value = 1;
+                updateImgTransform();
+            };
+            reader.readAsDataURL(file);
+        };
+        // Zoom
+        if (zoomSlider) zoomSlider.oninput = (e) => {
+            tempZoom = parseFloat(e.target.value);
+            updateImgTransform();
+        };
+        if (zoomInBtn) zoomInBtn.onclick = () => {
+            tempZoom = Math.min(3, tempZoom + 0.1);
+            zoomSlider.value = tempZoom.toFixed(2);
+            updateImgTransform();
+        };
+        if (zoomOutBtn) zoomOutBtn.onclick = () => {
+            tempZoom = Math.max(1, tempZoom - 0.1);
+            zoomSlider.value = tempZoom.toFixed(2);
+            updateImgTransform();
+        };
+        // Resetar posição
+        if (resetBtn) resetBtn.onclick = () => {
+            tempZoom = 1;
+            tempOffsetX = 0;
+            tempOffsetY = 0;
+            zoomSlider.value = 1;
+            updateImgTransform();
+        };
+        // Remover foto
+        if (removeBtn) removeBtn.onclick = () => {
+            tempSrc = null;
+            img.src = '';
+            img.style.display = 'none';
+            tempZoom = 1;
+            tempOffsetX = 0;
+            tempOffsetY = 0;
+            zoomSlider.value = 1;
+            updateImgTransform();
+        };
+        // Arrastar imagem
+        let dragging = false;
+        let startX = 0, startY = 0;
+        let originX = 0, originY = 0;
+        const onPointerDown = (e) => {
+            if (!tempSrc) return;
+            dragging = true;
+            img.classList.add('dragging');
+            startX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+            startY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+            originX = tempOffsetX;
+            originY = tempOffsetY;
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+            document.addEventListener('touchmove', onPointerMove, { passive: false });
+            document.addEventListener('touchend', onPointerUp);
+        };
+        const onPointerMove = (e) => {
+            if (!dragging) return;
+            e.preventDefault && e.preventDefault();
+            const clientX = e.type.startsWith('touch') ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type.startsWith('touch') ? e.touches[0].clientY : e.clientY;
+            const dx = (clientX - startX) / circle.offsetWidth;
+            const dy = (clientY - startY) / circle.offsetHeight;
+            // Limite dinâmico baseado no tamanho exibido da imagem (contain + zoom)
+            let maxOffsetX = 0, maxOffsetY = 0;
+            if (img && circle) {
+                // Tamanho do círculo
+                const circleRect = circle.getBoundingClientRect();
+                // Tamanho exibido da imagem
+                const imgRect = img.getBoundingClientRect();
+                // O quanto a imagem "sobra" em cada eixo
+                maxOffsetX = Math.max(0, (imgRect.width - circleRect.width) / (2 * circleRect.width));
+                maxOffsetY = Math.max(0, (imgRect.height - circleRect.height) / (2 * circleRect.height));
+            }
+            tempOffsetX = Math.max(-maxOffsetX, Math.min(maxOffsetX, originX + dx));
+            tempOffsetY = Math.max(-maxOffsetY, Math.min(maxOffsetY, originY + dy));
+            updateImgTransform();
+        };
+        const onPointerUp = () => {
+            dragging = false;
+            img.classList.remove('dragging');
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+            document.removeEventListener('touchmove', onPointerMove);
+            document.removeEventListener('touchend', onPointerUp);
+        };
+        if (circle) {
+            circle.addEventListener('mousedown', onPointerDown);
+            circle.addEventListener('touchstart', onPointerDown);
+        }
+        function updateImgTransform() {
+            if (!img) return;
+            if (!tempSrc) {
+                img.style.transform = 'none';
+                return;
+            }
+            if (tempZoom === 1 && tempOffsetX === 0 && tempOffsetY === 0) {
+                img.style.transform = 'none';
+            } else {
+                img.style.transform = `translate(${tempOffsetX * 100}%, ${tempOffsetY * 100}%) scale(${tempZoom})`;
+            }
+            // Garantir que o botão de upload fique acima da imagem
+            if (uploadBtn) uploadBtn.style.zIndex = 2001;
+        }
+        // Salvar ajustes
+        if (saveBtn) saveBtn.onclick = () => {
+            if (!tempSrc) {
+                this.removePhoto();
+                closeModal();
+                return;
+            }
+            this.character.foto = {
+                src: tempSrc,
+                srcOriginal: tempSrc,
+                zoom: tempZoom,
+                offsetX: tempOffsetX,
+                offsetY: tempOffsetY
+            };
+            this.photoZoom = tempZoom;
+            this.photoOffsetX = tempOffsetX;
+            this.photoOffsetY = tempOffsetY;
+            this.updatePhotoUI();
+            this.markDirty();
+            closeModal();
+        };
+        // Aspect ratio-aware drag limits
+        let imgNaturalWidth = 1, imgNaturalHeight = 1;
+        img.onload = function() {
+            imgNaturalWidth = img.naturalWidth;
+            imgNaturalHeight = img.naturalHeight;
+            updateImgTransform();
+        };
+    }
+    // --- Fim foto personagem ---
+
+    // Atualizar atributo da perícia
+    updateSkillAttribute(skillName, atributo) {
+        if (!this.character.pericias[skillName]) this.character.pericias[skillName] = {};
+        this.character.pericias[skillName].atributo = atributo;
+        this.updateSkills();
+        this.markDirty();
+        this.saveToLocalStorage();
+    }
 }
 
 // Initialize the application
@@ -1556,9 +1998,12 @@ window.app = app;
 
 // Adicionar alerta de confirmação ao sair
 window.addEventListener('beforeunload', function (e) {
-    e.preventDefault();
-    e.returnValue = 'Tem certeza que deseja sair? Suas alterações podem não estar salvas.';
-    return 'Tem certeza que deseja sair? Suas alterações podem não estar salvas.';
+    // Só exibir se houver alterações não exportadas
+    if (app.isDirty) {
+        e.preventDefault();
+        e.returnValue = 'Você fez alterações na ficha que não foram exportadas. Tem certeza que deseja sair?';
+        return 'Você fez alterações na ficha que não foram exportadas. Tem certeza que deseja sair?';
+    }
 });
 
 // Alternância de tema claro/escuro
@@ -1585,3 +2030,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('themeToggleBtn');
     if (btn) btn.addEventListener('click', toggleTheme);
 });
+
+// Adicionar lógica para o botão Zerar Ficha
+const resetBtn = document.getElementById('resetBtn');
+if (resetBtn) {
+    resetBtn.onclick = function() {
+        if (confirm('Tem certeza que deseja zerar a ficha? Esta ação não pode ser desfeita!')) {
+            app.character = app.getDefaultCharacter();
+            app.saveToLocalStorage();
+            app.updateUI();
+            app.updateAllCalculations();
+            app.populateSkills();
+            app.updateSkills();
+            app.renderCustomResources();
+            app.renderAbilities();
+            app.renderItems();
+            app.renderSpells();
+            app.renderPowers();
+            app.updatePhotoUI();
+            app.isDirty = false;
+        }
+    };
+}
