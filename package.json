@@ -1,0 +1,26 @@
+{
+  "name": "fichatormenta20site",
+  "version": "1.0.0",
+  "description": "Este projeto é uma aplicação web moderna para criação, edição e gerenciamento de fichas de personagem do sistema Tormenta 20 (T20), com design responsivo, navegação intuitiva e suporte a temas claro/escuro.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build:css": "sass assets/css/style.scss assets/css/style.css",
+    "watch:css": "sass --watch assets/css/style.scss:assets/css/style.css"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joaoLopesLenharo/fichaTormenta20Site.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/joaoLopesLenharo/fichaTormenta20Site/issues"
+  },
+  "homepage": "https://github.com/joaoLopesLenharo/fichaTormenta20Site#readme",
+  "devDependencies": {
+    "sass": "^1.92.1"
+  }
+}

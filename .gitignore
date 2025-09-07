@@ -1,24 +1,40 @@
-# Dependency directories
+# Dependências
 node_modules/
 
-# Build output
-_site/
+# Arquivos de build
 .sass-cache/
-.jekyll-cache/
-.jekyll-metadata
+*.css.map
 
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# Variáveis de ambiente
+.env*
+!.env.example
 
-# Editor directories and files
+# Editor/IDE
 .idea/
 .vscode/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+*.swp
+*.swo
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de desenvolvimento
+package-lock.json
+yarn.lock
+
+# Arquivos temporários
+.tmp
+.temp
+.cache/
